@@ -1,0 +1,200 @@
+﻿==================================================
+					<Constant>
+
+push constant i
+//스택에 i라는 상수를 넣는다.
+
+@i
+D=A
+@SP
+A=M
+M=D
+
+@SP
+M=M+1;
+------------------------------------
+pop constant i
+//스택 최상단에 있는 값을 RAM[i]로 뺀다
+@SP
+M=M-1
+A=M
+D=M
+M=0
+
+@i
+M=D
+
+==================================================
+					<Segment>
+push segment i   
+//segment : local, argument , this , that 가능한 명령어
+//STACK 최상단에 segment[i]를 넣는다.
+//= STACK 최상단에 RAM[segmentBase +i]를 넣는다.
+/*  pseudo code
+addr <- segmentPointer + i 
+RAM[SP] <- RAM [addr]
+SP++
+*/
+
+
+//1. addr <- segmentPointer + i 
+@LCL //local 세그먼트 영역  : LCL/ARG/THIS/THAT  가능
+D=M
+@i
+D=A+D //D에는 addr 값
+
+//2.RAM[SP] <- RAM [addr]
+A=D
+D=M //D에는 RAM[addr] 값
+
+@SP
+A=M
+M=D //RAM[RAM[SP]] == RAM[addr] 
+
+//3.SP++
+@SP
+M=M+1
+
+-----------------------------------------
+pop segment i 
+//Stack 최상단값을 segment[i]으로 넣는다.
+//= STACK 최상단값을 RAM[segmentBase +i]으로 넣는다.
+/*
+addr <- segmentPointer + i
+SP--
+RAM[addr] <- RAM[SP]
+*/
+
+//1. addr <- segmentPointer + i 
+@LCL //local 세그먼트 영역
+D=M
+@i
+D=A+D //D에는 addr 값
+
+//2.SP--
+@SP
+M=M+1
+
+//3.RAM[addr] <- RAM[SP]
+@x //중간 매개변수 필요
+M=D // x라는 변수에 addr값을 넣어두었다.
+
+@SP
+A=M
+D=M //RAM[RAM[SP]]
+
+@segmentVariable
+A=M //segmentVariable라는 변수에 있는 addr을 주소로 함.
+M=D // RAM[addr] = RAM[RAM[SP]]
+
+
+
+
+여기까지는 local/argument/this/that/constant 한정해서 가능한 것
+
+==============================================================
+						<static>
+static 세그먼트는 한 .vm 파일에서 각 함수들이 공유하는 것
+RAM[16-255]
+
+push/pop static i는 
+어셈블리 레벨에서 보면 push/pop Foo.i라고 볼 수 있다. 이말은 그저 변수 i라는 이야기이다.
+
+--------------------------------------------------------------
+
+push static i
+//스택에 i라는 변수의 값을 넣는다.
+
+@i
+D=M // 변수i 의 값을 D에 넣는다.
+@SP
+A=M
+M=D
+@SP
+M=M+1;
+
+--------------------------------------------------------------
+
+pop static i
+//스택 최상단에 있는 값을 i라는 변수의 위치로 뺀다
+
+@SP
+M=M-1
+A=M
+D=M
+M=0
+
+@i
+M=D
+
+==============================================================
+						<temp>
+A fixed, 8-entry segment  :temp 0, temp 1, ---, temp 7
+RAM[5-12]가 해당된다.
+
+push/pop temp i 는 어셈블리 코드로는 push/pop RAM[5+i] 이다.
+
+------------------------------------------------------------
+push temp i 
+//스택에 RAM[5+i]라는 변수의 값을 넣는다.
+
+//1.5+i 연산
+@i
+D=A
+@5
+D=A+D // D에 i+5
+
+//2.RAM[5+i]
+A=D
+D=M
+
+//3.RAM[RAM[SP]] <- RAM[5+i]
+@SP
+A=M
+M=D
+//4.SP++
+@SP
+M=M+1;
+
+----------------------------------------------------------------
+pop temp i
+//스택 최상단에 있는 값을 RAM[5+i]로 뺀다
+
+
+//0.tempVariable라는 변수에 5+i값을 넣는다
+@5
+D=A
+@i
+D=D+A
+@tempVariable
+M=D
+
+//1.D <- RAM[SP-1], RAM[SP-1]<-0
+@SP
+M=M-1
+A=M
+D=M
+M=0
+
+
+//2.RAM[5+i] <- D
+@tempVariable
+A=M
+M=D
+
+===================================================================
+						<pointer>
+push/pop pointer 0 는 어셈블리 코드로 push/pop THIS 라고 볼 수 있다.
+push/pop pointer 1 는 어셈블리 코드로 push/pop THAT 라고 볼 수 있다.
+
+포인터는 2가지 있다고 봐야하나 싶다.
+1.this 세그먼트로 현재 객체의 필드를 정한다.
+2.that 세그먼트로 현재 배열의 요소를 정한다.
+
+배열과 객체를 사용하는 프로그램을 동작시킬 때,
+동적으로 세그먼트의 base addresses을 유지해야한다.
+pointer는 2-place segment이다.
+
+
+(※ pointer 세그먼트에 자세한 사항은 Chapter11 컴파일러에서 설명할 것이다.)
+
